@@ -1,0 +1,8 @@
+auth_modules:
+  postgres:
+    type: userpass
+    userpass:
+      username: postgres_exporter
+      password: postgres_exporter
+    options:
+      sslmode: disable

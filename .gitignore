@@ -1,0 +1,12 @@
+.DS_Store
+.vscode/
+*.code-workspace
+
+primary/data/
+primary/log/
+
+replica1/data/
+replica1/log/
+
+replica2/data/
+replica2/log/

@@ -1,0 +1,111 @@
+version: '3.8'
+services: 
+  postgres14-primary:
+    build: ./primary
+    container_name: postgres14-primary 
+    ports:
+      - 15432:5432
+    environment:
+      POSTGRES_DB: test
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=ja_JP.UTF-8 --lc-ctype=ja_JP.UTF-8"
+    volumes:
+      - ./primary/initdb.d:/docker-entrypoint-initdb.d
+      - ./primary/data:/var/lib/postgresql/data
+      - ./primary/log:/var/log/postgres
+    tty: true
+    networks:
+      - default
+
+  postgres14-replica1:
+    build: ./replica1
+    container_name: postgres14-replica1
+    ports:
+       - 25432:5432
+    environment:
+      POSTGRES_DB: test
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=ja_JP.UTF-8 --lc-ctype=ja_JP.UTF-8"
+    volumes:
+      - ./replica1/initdb.d:/docker-entrypoint-initdb.d
+      - ./replica1/data:/var/lib/postgresql/data
+      - ./replica1/log:/var/log/postgres
+    depends_on:
+      - postgres14-primary
+    tty: true
+    networks:
+      - default
+
+  postgres14-replica2:
+    build: ./replica2
+    container_name: postgres14-replica2
+    ports:
+       - 35432:5432
+    environment:
+      POSTGRES_DB: test
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=ja_JP.UTF-8 --lc-ctype=ja_JP.UTF-8"
+    volumes:
+      - ./replica2/initdb.d:/docker-entrypoint-initdb.d
+      - ./replica2/data:/var/lib/postgresql/data
+      - ./replica2/log:/var/log/postgres
+    depends_on:
+      - postgres14-primary
+    tty: true
+    networks:
+      - default
+
+  postgres-exporter:
+    build: ./postgres-exporter
+    container_name: postgres-exporter
+    command: "--config.file=/etc/postgres_exporter/postgres_exporter.yml"
+    volumes:
+      - ./postgres-exporter/postgres-exporter.yml:/etc/postgres_exporter
+    ports:
+      - 19187:9187
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres_exporter:postgres_exporter@postgres14-primary:5432/postgres?sslmode=disable,postgresql://postgres_exporter:postgres_exporter@postgres14-replica1:5432/postgres?sslmode=disable"
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "true"
+    depends_on:
+      - postgres14-primary
+      - postgres14-replica1
+    restart: always
+    networks:
+      - default
+
+  prometheus:
+    build: ./prometheus
+    container_name: jabe-prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command: "--config.file=/etc/prometheus/prometheus.yml"
+    ports:
+      - 9090:9090
+    depends_on:
+      - postgres-exporter
+      - node-exporter
+    networks:
+      - default
+
+  node-exporter:
+    build: ./node-exporter
+    container_name: node-exporter
+    ports:
+      - 9100:9100
+    networks:
+      - default
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - 3000:3000
+    depends_on:
+      - prometheus
+      - node-exporter
+      - postgres-exporter
+    networks:
+      - default
